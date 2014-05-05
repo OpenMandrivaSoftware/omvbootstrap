@@ -1,0 +1,4 @@
+VERSION="0.0.0"
+MIRRORLIST="http://downloads.openmandriva.org/mirrors/openmandriva.VERSION.ARCH.list"
+FALLBACK="http://mirror.yandex.ru/openmandriva/openmandrivaVERSION/repository/ARCH/"
+BASE_PACKAGES=("basesystem-minimal" "urpmi")

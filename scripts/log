@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# logging functions
+#
+
+log_debug=0
+
+[ -n "$OMVBTS_DEBUG" ] && log_debug=1
+help_addenv "OMVBTS_DEBUG" "toggle debug messages"
+
+debug() {
+	if [ $log_debug != 0 ]; then
+		cecho "[debug] $*" $black
+	fi
+}
+
+log() {
+	cecho "[ info] $*" $green
+}
+
+warn() {
+	cecho "[ warn] $*" $yellow
+}
+
+error() {
+	cecho "[error] $*" $red
+}
+
+fatal() {
+	cecho "[FATAL] $*" $magenta
+	exit 1
+}

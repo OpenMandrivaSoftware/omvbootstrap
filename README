@@ -1,0 +1,14 @@
+I decided on a Saturday 3 May 2014 morning that it would be a good idea to make a bootstrap tool for OpenMandriva Lx.
+This was not only for my comfort in not having to boot up a bloody VM every time to develop, but also
+for those people who don't want a graphical environment to install a simple distribution, like in server environments.
+
+So I made this. On the first weekend I was free. Out of all the things I could have spent my 24 hours of relaxation
+on, I spent it on this. Just for the hell of it. What was I thinking?!
+
+And now, finals approach. (save me pls)
+
+Usage:
+    git clone https://github.com/robxu9/omvbootstrap.git
+    cd omvbootstrap
+    sudo ./omvbootstrap -h
+

@@ -1,0 +1,6 @@
+bash forking is expensive. and annoying. pls don't use.
+we don't want to evaluate every time we call a variable.
+
+functions that need to return should set ${_RET}.
+
+e.g. function call: mirror_country; country=$_RET

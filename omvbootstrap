@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+#
+# omvbootstrap
+# a very very crappily made script
+# to network-bootstrap OpenMandriva Lx
+#
+# robert xu [robxu9 | 2014]
+
+# pls don't kill me for crappy scripting
+
+# source external scripts
+for f in scripts/*; do source $f; done
+
+# source variables
+source variables
+
+# get pwd
+PWD=`pwd`
+
+log "this is omvbootstrap $VERSION"
+log "it comes under no warranty and is crappily made"
+log
+
+# test getopt
+debug "testing getopt"
+getopt -T &> /dev/null
+if [ $? != 4 ]; then
+	fatal "getopt is not enhanced - requires gnu getopt"
+fi
+
+# process arguments
+
+help_addarg "debug" "toggle debug messages" "d"
+help_addarg "version" "version to download" "v"
+help_addarg "arch" "architecture to use" "a"
+help_addarg "help" "show the help menu" "h"
+help_addarg "mirror" "use specific mirror url" "m"
+help_addarg "pkg" "add additional package to base" "p"
+help_addarg "listshift" "shift mirrors used on mirrorlist" "l"
+help_addarg "chroot" "set the chroot location" "c"
+help_addarg "clean" "clean work directories" "x"
+help_addarg "run" "chroot into existing chroot" "r"
+
+arguments=$(getopt -o dv:a:hm:p:l:c:xr --long debug,version:,arch:,help,mirror:,pkg:,listshift:,chroot:,clean,run \
+             -n "$0" -- "$@")
+
+[ $? != 0 ] && fatal "could not parse arguments. dying."
+
+# Note the quotes around `$TEMP': they are essential!
+eval set -- "$arguments"
+
+VERSION=
+ARCH=
+MIRROR=
+PKG=()
+
+LISTSHIFT=1
+
+CHROOT=
+clean=0
+run=0
+
+while true; do
+  case "$1" in
+    -d | --debug ) log_debug=1; shift ;;
+    -v | --version ) VERSION="$2"; shift 2 ;;
+    -a | --arch ) ARCH="$2"; shift 2 ;;
+    -h | --help ) help_print; shift ;;
+    -m | --mirror ) MIRROR="$2"; shift 2 ;;
+    -p | --pkg ) PKG=($PKG "$2"); shift 2 ;;
+    -l | --listshift ) LISTSHIFT=$2; shift 2 ;;
+    -c | --chroot ) CHROOT=$2; shift 2 ;;
+    -x | --clean ) clean=1; shift ;;
+    -r | --run ) run=1; shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+debug "version is $VERSION"
+debug "arch is $ARCH"
+debug "mirror is $MIRROR"
+
+# check to make sure we're running as root
+[ `whoami` != "root" ] && fatal "you need to be running as root"
+
+# if we're just running only, then run and exit
+if [ $run != 0 ]; then
+	log "run mode selected."
+	[ ! -d $CHROOT ] && fatal "chroot doesn't exist"
+	run_chroot $CHROOT
+	exit 0
+fi
+
+# check to make sure that version and arch are set (required)
+[ -z $VERSION ] && fatal "-v/--version is required (e.g. 2014.0)"
+[ -z $ARCH ] && fatal "-a/--arch is required (e.g. i586)"
+
+# check to see we have valid parameters
+[[ $LISTSHIFT < 1 ]] && fatal "-l/--listshift must be >= 1"
+
+# check to see if chroot location is set
+[ -z $CHROOT ] && fatal "-c/--chroot is required (e.g. /mnt)"
+
+# make temporary directories
+log "making work directories"
+[ $clean -ne 0 ] && rm -rf work && mkdir -p work/{tmp,rpm}
+
+# make chroot
+log "making chroot"
+[ -e $CHROOT ] && rm -rf $CHROOT
+mkdir -p $CHROOT
+[ $? != 0 ] && fatal "can't make chroot!"
+
+# okay, they are - let's grab mirrorlists?
+# if we don't specify a specific mirrorlist
+if [ -z $MIRROR ]; then
+	log "no specific mirror specified, trying to get mirror from mirrorlist"
+	
+	mirror_country; country=$_RET
+	log "using country $country"
+	
+	mirror_url $LISTSHIFT $country; MIRROR=$_RET
+	log "using distrib mirror $MIRROR"
+	
+	# we only want main
+	MIRROR+="media/main/release"
+	log "--> main $MIRROR"
+fi
+
+# let's get the main repository only
+
+# good - now let's read the metadata files
+# --> read synthesis.hdlist.cz
+log "retrieving synthesis.hdlist.cz from $MIRROR..."
+curl -s $MIRROR/media_info/synthesis.hdlist.cz > work/tmp/synthesis.hdlist.cz
+[ $? != 0 ] && fatal "failed to retrieve synthesis.hdlist.cz from $MIRROR..."
+
+# get all packages we need
+PKG=( ${PKG[@]} ${BASE_PACKAGES[@]} )
+
+# dependency resolution time! call python script to do dep resolution
+log "reading package lists..."
+toInstall=$(python parse_synthesis.py work/tmp/synthesis.hdlist.cz ${PKG[@]})
+[ $? != 0 ] && error "failed to parse synthesis.hdlist.cz from $MIRROR..." && fatal "$toInstall"
+log
+
+# display the transaction
+log "transaction:"
+for i in $toInstall; do
+	log "    [install] $i"
+done
+log
+
+# download!
+log "retrieving packages to work/rpm..."
+for i in $toInstall; do
+	res=$(download_rpm $MIRROR $i.rpm)
+	if [ $res != "OK" ] && [ $res != "CACHED" ]; then
+		error "    downloading $i.rpm..." $res
+		fatal "couldn't download package!"
+	else
+		log "    downloading $i.rpm..." $res
+	fi
+done
+log
+
+# stage 1 - unpacking recklessly to install
+log "stage 1 - unpacking recklessly..."
+for i in $toInstall; do
+	log "    unpacking $i..."
+	_RET=$(unpack_rpm $PWD/work/rpm/$i.rpm $CHROOT)
+	if [ $_RET != "0" ]; then
+		error "error occurred unpacking $i..."
+		warn "will keep going hoping everything still works"
+	fi
+done
+log
+
+# stage 2 - chrooting and then letting loose with urpmi
+log "stage 2 - chrooting and urpmi'ng"
+
+run_chroot $CHROOT /usr/sbin/urpmi.addmedia Bootstrap $MIRROR
+run_chroot $CHROOT /usr/sbin/urpmi.update -a
+# download all because resolv.conf gets...overwritten
+run_chroot $CHROOT /usr/sbin/urpmi --force --curl --download-all --no-suggests --auto --prefer curl,perl,vim-enhanced,pinentry-qt4 ${PKG[@]}
+
+run_chroot $CHROOT /usr/sbin/urpmi.removemedia -a
+mirror_listurl
+run_chroot $CHROOT /usr/sbin/urpmi.addmedia --distrib --mirrorlist $_RET --no-md5sum
+run_chroot $CHROOT /usr/sbin/urpmi.update -a
+log
+
+# we're done here
+log "we're done here."
+
+exit 0

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+# mirror functions
+
+# get the country of this computer's ip
+mirror_country() {
+	which geoiplookup &> /dev/null
+	[ $? != 0 ] && error "can't lookup closest mirror - no geoiplookup" && return
+	local externIP=`curl -s ipecho.net/plain`
+	local country=$(geoiplookup $externIP | grep 'Country Edition')
+	[ $? != 0 ] && error "can't lookup closest mirror - failed to find"
+	_RET=${country:27}
+}
+
+# $_RET url for mirrorlist
+mirror_listurl() {
+	_RET=$(echo $MIRRORLIST | sed -e s/VERSION/$VERSION/ | sed -e s/ARCH/$ARCH/)
+}
+
+# get a mirror for the specified country
+# $1 # of mirrors to skip
+# $* country
+# $_RET url for mirror in country
+mirror_url() {
+	local mirrorlist=$(echo $MIRRORLIST | sed -e s/VERSION/$VERSION/ | sed -e s/ARCH/$ARCH/)
+	debug "trying to get mirror from $mirrorlist"
+	
+	# in case the mirrorlist is bad
+	local headcount=$1
+	shift
+	
+	# join country (United States -> United_States)
+	local formattedCountry=$(printf "%s_%s" $*)
+	debug "country (mirrorlist formatted) is $formattedCountry"
+
+	local firstmirror=$(curl -s $mirrorlist | grep -i $formattedCountry | head -n$headcount | tail -n1)
+	debug "mirror line is $firstmirror"
+	
+	if [ -z $firstmirror ]; then # no mirror found, fallback
+		warn "no mirror for your country; using fallback"
+		echo $FALLBACK | sed -e s/VERSION/$VERSION/ | sed -e s/ARCH/$ARCH/
+	else
+		count=0
+		while IFS="=" read -ra ADDR; do
+			for i in "${ADDR[@]}"; do
+				if [ $count != 9 ]; then
+					let "count+=1"
+				else
+					_RET=$i
+					break
+				fi
+			done
+		done <<< "$firstmirror"
+	fi
+}

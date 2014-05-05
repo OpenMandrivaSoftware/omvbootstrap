@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# downloader functions because I'm lazy
+#
+
+# $1 mirror
+# $2 rpm to download
+download_rpm() {
+	cd work/rpm
+	[ -f $2 ] && echo -n "CACHED" && return
+	curl -s -O $1/$2
+	if [ $? == 0 ]; then echo -n "OK";
+	else echo -n "FAIL"; fi
+}

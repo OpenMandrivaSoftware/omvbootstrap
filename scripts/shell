@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# random shell manip functions
+
+black='\E[30;47m'
+red='\E[31;47m'
+green='\E[32;47m'
+yellow='\E[33;47m'
+blue='\E[34;47m'
+magenta='\E[35;47m'
+cyan='\E[36;47m'
+white='\E[37;47m'
+
+# resets colours
+creset() {
+	echo -ne '\E[0m'
+}
+
+# echo in colour
+# $1 message
+# $2 colour
+cecho() {
+	local default=""
+	message=${1:-$default}
+	color=${2:-$black}
+	echo -ne "$color"
+	echo -n "$message"
+	creset
+	echo
+}

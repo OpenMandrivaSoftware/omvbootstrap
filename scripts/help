@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# help menu functions
+#
+
+# arguments:
+help_args=()
+
+# add an argument to the help menu
+# $1 argument option
+# $2 description
+# -$3 short argument option
+help_addarg() {
+	if [ -n "$3" ]; then
+		help_args=("${help_args[@]}" "-$3;--$1: $2")
+	else
+		help_args=("${help_args[@]}" "--$1: $2")
+	fi
+}
+
+# environment variables:
+help_envvar=()
+
+# add an environment variable to the help menu
+# $1 environment variable
+# $2 description
+help_addenv() {
+	help_envvar=("${help_envvar[@]}" "$1: $2")
+}
+
+help_print() {
+	log "help menu"
+	log
+	log "arguments:"
+	for i in "${help_args[@]}"; do
+		log "    $i"
+	done
+	log "environment variables:"
+	for i in "${help_envvar[@]}"; do
+		log "    $i"
+	done
+	fatal "exiting after showing help menu"
+}

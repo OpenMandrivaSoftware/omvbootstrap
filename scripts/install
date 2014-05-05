@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# rpm2cpio functions
+# thank you https://gist.github.com/ruario/9674124
+# wait it doesn't work :(
+
+# decompress rpm
+# $1 path to RPM to decompress
+bad_rpm2cpio() {
+	RPMHDRLGTH=$(LANG=C grep -abom1 '.7zXZ\|]'$'\000\000''....'$'\377\377\377\377\377\377''\|BZh9\|'$'\037\213\b' "$1")
+	case "$RPMHDRLGTH" in
+		*7zXZ) COMPRESSOR=xz ;;
+		*]*) COMPRESSOR=lzma ;;
+		*BZh9) COMPRESSOR=bzip2 ;;
+		*) COMPRESSOR=gzip ;;
+	esac
+	tail -c+$[${RPMHDRLGTH%:*}+1] "$1" | $COMPRESSOR -d
+}
+
+# trying https://gist.github.com/elasticdog/7112671 's
+nope_rpm2cpio() {
+	pkg=$1
+	if [ "$pkg" = "" -o ! -e "$pkg" ]; then
+	  echo "no package supplied" 1>&2
+	  return 1
+	fi
+
+	leadsize=96
+	o=`expr $leadsize + 8`
+	set `od -j $o -N 8 -t u1 $pkg`
+	il=`expr 256 \* \( 256 \* \( 256 \* $2 + $3 \) + $4 \) + $5`
+	dl=`expr 256 \* \( 256 \* \( 256 \* $6 + $7 \) + $8 \) + $9`
+	# echo "sig il: $il dl: $dl"
+
+	sigsize=`expr 8 + 16 \* $il + $dl`
+	o=`expr $o + $sigsize + \( 8 - \( $sigsize \% 8 \) \) \% 8 + 8`
+	set `od -j $o -N 8 -t u1 $pkg`
+	il=`expr 256 \* \( 256 \* \( 256 \* $2 + $3 \) + $4 \) + $5`
+	dl=`expr 256 \* \( 256 \* \( 256 \* $6 + $7 \) + $8 \) + $9`
+	# echo "hdr il: $il dl: $dl"
+
+	hdrsize=`expr 8 + 16 \* $il + $dl`
+	o=`expr $o + $hdrsize`
+	EXTRACTOR="dd if=$pkg ibs=$o skip=1"
+
+	COMPRESSION=`($EXTRACTOR |file -) 2>/dev/null`
+	if echo $COMPRESSION | grep -q gzip; then
+	  DECOMPRESSOR=gunzip
+	elif echo $COMPRESSION | grep -q bzip2; then
+	  DECOMPRESSOR=bunzip2
+	elif echo $COMPRESSION | grep -q xz; then
+	  DECOMPRESSOR=unxz
+	elif echo $COMPRESSION | grep -q cpio; then
+	  DECOMPRESSOR=cat
+	else
+	  # Most versions of file don't support LZMA, therefore we assume
+	  # anything not detected is LZMA
+	  DECOMPRESSOR=`which unlzma 2>/dev/null`
+	  case "$DECOMPRESSOR" in
+		/* )
+		  ;;
+		*  )
+		  DECOMPRESSOR=`which lzmash 2>/dev/null`
+		  case "$DECOMPRESSOR" in
+		    /* )
+		      DECOMPRESSOR="lzmash -d -c"
+		      ;;
+		    *  )
+		      DECOMPRESSOR=cat
+		      ;;
+		  esac
+		  ;;
+	  esac
+	fi
+
+	$EXTRACTOR 2>/dev/null | $DECOMPRESSOR
+}
+
+# unpack rpm to directory
+# $1 path to RPM to decompress
+# $2 path to chroot
+unpack_rpm() {
+	cd $2
+	perl ../rpm2cpio.pl $1 | cpio -idum --quiet
+	echo $?
+}
+
+do_cleanup=""
+
+cleanup_chroot() {
+	if [ "$do_cleanup" != "" ]; then
+		rm -f $do_cleanup/etc/resolv.conf
+		mv $do_cleanup/etc/resolv.conf.old $do_cleanup/etc/resolv.conf
+		
+		umount -Rf $do_cleanup/proc
+		umount -Rf $do_cleanup/sys
+		sleep 2 # failsafes
+		umount -Rf $do_cleanup/dev
+	fi
+}
+
+trap cleanup_chroot EXIT
+
+# run in chroot-
+# $1 chroot to run
+# $* commands
+run_chroot() {
+	local chroot_path=$1
+	shift
+	do_cleanup="$chroot_path"
+	
+	# set mountpoints
+	mount -t proc proc $chroot_path/proc/
+	mount -t sysfs sys $chroot_path/sys/
+	mount -o bind /dev $chroot_path/dev/
+	mount -t devpts pts $chroot_path/dev/pts/
+
+	# internet
+	mv $chroot_path/etc/resolv.conf $chroot_path/etc/resolv.conf.old
+	cp /etc/resolv.conf $chroot_path/etc/resolv.conf
+
+	LC_ALL=C chroot "$chroot_path" $*
+	cleanup_chroot
+	do_cleanup=""
+}
