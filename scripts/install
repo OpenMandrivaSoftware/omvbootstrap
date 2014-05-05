@@ -1,28 +1,17 @@
 #!/usr/bin/env bash
 #
 # rpm2cpio functions
-# thank you https://gist.github.com/ruario/9674124
-# wait it doesn't work :(
+# thank you Jeff Johnson
 
-# decompress rpm
-# $1 path to RPM to decompress
-bad_rpm2cpio() {
-	RPMHDRLGTH=$(LANG=C grep -abom1 '.7zXZ\|]'$'\000\000''....'$'\377\377\377\377\377\377''\|BZh9\|'$'\037\213\b' "$1")
-	case "$RPMHDRLGTH" in
-		*7zXZ) COMPRESSOR=xz ;;
-		*]*) COMPRESSOR=lzma ;;
-		*BZh9) COMPRESSOR=bzip2 ;;
-		*) COMPRESSOR=gzip ;;
-	esac
-	tail -c+$[${RPMHDRLGTH%:*}+1] "$1" | $COMPRESSOR -d
-}
+# you can see this script also in /usr/lib/rpm/rpm2cpio
+# if you have RPM installed
 
-# trying https://gist.github.com/elasticdog/7112671 's
-nope_rpm2cpio() {
+# $1 - RPM package to cpio
+rpm2cpio() {
 	pkg=$1
 	if [ "$pkg" = "" -o ! -e "$pkg" ]; then
-	  echo "no package supplied" 1>&2
-	  return 1
+		echo "no package supplied" 1>&2
+	   return 1
 	fi
 
 	leadsize=96
@@ -44,33 +33,27 @@ nope_rpm2cpio() {
 	EXTRACTOR="dd if=$pkg ibs=$o skip=1"
 
 	COMPRESSION=`($EXTRACTOR |file -) 2>/dev/null`
-	if echo $COMPRESSION | grep -q gzip; then
-	  DECOMPRESSOR=gunzip
-	elif echo $COMPRESSION | grep -q bzip2; then
-	  DECOMPRESSOR=bunzip2
-	elif echo $COMPRESSION | grep -q xz; then
-	  DECOMPRESSOR=unxz
-	elif echo $COMPRESSION | grep -q cpio; then
-	  DECOMPRESSOR=cat
+	if echo $COMPRESSION |grep -q gzip; then
+		DECOMPRESSOR=gunzip
+	elif echo $COMPRESSION |grep -q bzip2; then
+		DECOMPRESSOR=bunzip2
+	elif echo $COMPRESSION |grep -q xz; then
+		DECOMPRESSOR=unxz
+	elif echo $COMPRESSION |grep -q cpio; then
+		DECOMPRESSOR=cat
 	else
-	  # Most versions of file don't support LZMA, therefore we assume
-	  # anything not detected is LZMA
-	  DECOMPRESSOR=`which unlzma 2>/dev/null`
-	  case "$DECOMPRESSOR" in
-		/* )
-		  ;;
-		*  )
-		  DECOMPRESSOR=`which lzmash 2>/dev/null`
-		  case "$DECOMPRESSOR" in
-		    /* )
-		      DECOMPRESSOR="lzmash -d -c"
-		      ;;
-		    *  )
-		      DECOMPRESSOR=cat
-		      ;;
-		  esac
-		  ;;
-	  esac
+		# Most versions of file don't support LZMA, therefore we assume
+		# anything not detected is LZMA
+		DECOMPRESSOR=`which unlzma 2>/dev/null`
+		case "$DECOMPRESSOR" in
+			/* ) ;;
+			*  ) DECOMPRESSOR=`which lzmash 2>/dev/null`
+			     case "$DECOMPRESSOR" in
+			         /* ) DECOMPRESSOR="lzmash -d -c" ;;
+			         *  ) DECOMPRESSOR=cat ;;
+			     esac
+			     ;;
+		esac
 	fi
 
 	$EXTRACTOR 2>/dev/null | $DECOMPRESSOR
@@ -81,7 +64,7 @@ nope_rpm2cpio() {
 # $2 path to chroot
 unpack_rpm() {
 	cd $2
-	perl ../rpm2cpio.pl $1 | cpio -idum --quiet
+	rpm2cpio $1 | cpio -idum --quiet
 	echo $?
 }
 
