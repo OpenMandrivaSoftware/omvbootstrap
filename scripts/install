@@ -79,6 +79,7 @@ cleanup_chroot() {
 		umount -Rf $do_cleanup/sys
 		sleep 2 # failsafes
 		umount -Rf $do_cleanup/dev
+		mount -o remount,gid=5,mode=620 /dev/pts
 	fi
 }
 
@@ -97,6 +98,9 @@ run_chroot() {
 	mount -t sysfs sys $chroot_path/sys/
 	mount -o bind /dev $chroot_path/dev/
 	mount -t devpts pts $chroot_path/dev/pts/
+	
+	# I'm going to assume that /dev/pts likes to keep blowing up
+	mount -o remount,gid=5,mode=620 /dev/pts
 
 	# internet
 	mv $chroot_path/etc/resolv.conf $chroot_path/etc/resolv.conf.old
