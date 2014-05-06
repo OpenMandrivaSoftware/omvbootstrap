@@ -14,7 +14,7 @@ mirror_country() {
 
 # $_RET url for mirrorlist
 mirror_listurl() {
-	_RET=$(echo $MIRRORLIST | sed -e s/VERSION/$VERSION/ | sed -e s/ARCH/$ARCH/)
+	_RET=$(echo $MIRRORLIST | sed -e s/VERSION/$VERSION/g | sed -e s/ARCH/$ARCH/g)
 }
 
 # get a mirror for the specified country
@@ -22,7 +22,8 @@ mirror_listurl() {
 # $* country
 # $_RET url for mirror in country
 mirror_url() {
-	local mirrorlist=$(echo $MIRRORLIST | sed -e s/VERSION/$VERSION/ | sed -e s/ARCH/$ARCH/)
+	mirror_listurl
+	local mirrorlist=$_RET
 	debug "trying to get mirror from $mirrorlist"
 	
 	# in case the mirrorlist is bad
@@ -33,7 +34,7 @@ mirror_url() {
 	local formattedCountry=$(printf "%s_%s" $*)
 	debug "country (mirrorlist formatted) is $formattedCountry"
 
-	local firstmirror=$(curl -s $mirrorlist | grep -i $formattedCountry | head -n$headcount | tail -n1)
+	local firstmirror=$(curl -s $mirrorlist | sed -e 's/ /_/g' | grep -i $formattedCountry | head -n$headcount | tail -n1)
 	debug "mirror line is $firstmirror"
 	
 	if [ -z $firstmirror ]; then # no mirror found, fallback
