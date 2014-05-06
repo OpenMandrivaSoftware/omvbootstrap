@@ -7,6 +7,13 @@ on, I spent it on this. Just for the hell of it. What was I thinking?!
 
 And now, finals approach. (save me pls)
 
+Requirements:
+    python2
+    bash
+    cpio
+    xz/lzma/gzip/bzip2 [depending on the package compression]
+        this is usually xz nowadays
+
 Usage:
     git clone https://github.com/robxu9/omvbootstrap.git
     cd omvbootstrap
