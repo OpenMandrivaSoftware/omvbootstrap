@@ -104,7 +104,10 @@ fi
 
 # make temporary directories
 log "making work directories"
-[ $clean -ne 0 ] && rm -rf work && mkdir -p work/{tmp,rpm}
+[ $clean -ne 0 ] && rm -rf work
+[ ! -d work ] && mkdir -p work
+[ ! -d work/tmp ] && mkdir work/tmp
+[ ! -d work/rpm ] && mkdir work/rpm
 
 # make chroot
 log "making chroot"
