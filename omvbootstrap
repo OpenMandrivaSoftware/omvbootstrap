@@ -180,8 +180,15 @@ for i in $toInstall; do
 done
 log
 
+# stage 2 - move downloaded RPMs to $CHROOT/var/cache/urpmi/rpms so that we don't have to redownload
+log "stage 2 - moving downloaded RPMs to /var/cache/urpmi/rpms to prevent the need to redownload some stuff"
+for i in work/rpm/*.rpm; do
+    log "    copying $i to /var/cache/urpmi/rpms..."
+    cp $i $CHROOT/var/cache/urpmi/rpms
+done
+
 # stage 2 - chrooting and then letting loose with urpmi
-log "stage 2 - chrooting and urpmi'ng"
+log "stage 3 - chrooting and urpmi'ng"
 
 run_chroot $CHROOT /usr/sbin/urpmi.addmedia Bootstrap $MIRROR
 run_chroot $CHROOT /usr/sbin/urpmi.update -a
