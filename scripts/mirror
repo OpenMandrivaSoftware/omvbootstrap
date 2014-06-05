@@ -22,6 +22,13 @@ mirror_listurl() {
 # $* country
 # $_RET url for mirror in country
 mirror_url() {
+    if [ "$VERSION" == "cooker" ]; then
+        # we need to be special for cooker
+        log "You're requesting cooker - so we're not using mirrors."
+        _RET="http://abf-downloads.rosalinux.ru/cooker/repository/$ARCH/"
+        return
+    fi
+
 	mirror_listurl
 	local mirrorlist=$_RET
 	debug "trying to get mirror from $mirrorlist"
