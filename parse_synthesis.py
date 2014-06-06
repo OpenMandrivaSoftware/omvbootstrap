@@ -83,41 +83,42 @@ def _parse_rpm_capability_list(cap_str_list):
 
     return tuple(cap_list)
 
+def handleline(line, add_raw):
+    pkg = {}
+    
+    if add_raw:
+        if 'raw' not in pkg:
+            pkg['raw'] = ''
+        pkg['raw'] += line
+
+    fields = line.rstrip('\n').split('@')[1:]
+    ltype = fields.pop(0)
+
+    if ltype == 'info':
+        (pkg['name'],
+         pkg['version'],
+         pkg['release'],
+         pkg['dist'],
+         pkg['arch']) = _parse_rpm_name(fields.pop(0))
+        for field in ('epoch', 'size', 'group'):
+            pkg[field] = fields.pop(0)
+        yield pkg
+        pkg = {}
+    elif ltype == 'summary':
+        pkg['summary'] = fields.pop(0)
+    elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
+        pkg[ltype] = _parse_rpm_capability_list(fields)
 
 def parse(hdlist, add_raw=False):
     """Create a generator of packages parsed from synthesis hdlist
     file."""
 
-    pkg = {}
     try:
-        openList = gzip.open(hdlist, 'rb')
+        for line in gzip.open(hdlist, 'rb'):
+            yield handleline(line, add_raw)
     except IOError:
-        openList = lzma.open(hdlist, 'rb')
-
-    for line in openList:
-
-        if add_raw:
-            if 'raw' not in pkg:
-                pkg['raw'] = ''
-            pkg['raw'] += line
-
-        fields = line.rstrip('\n').split('@')[1:]
-        ltype = fields.pop(0)
-
-        if ltype == 'info':
-            (pkg['name'],
-             pkg['version'],
-             pkg['release'],
-             pkg['dist'],
-             pkg['arch']) = _parse_rpm_name(fields.pop(0))
-            for field in ('epoch', 'size', 'group'):
-                pkg[field] = fields.pop(0)
-            yield pkg
-            pkg = {}
-        elif ltype == 'summary':
-            pkg['summary'] = fields.pop(0)
-        elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
-            pkg[ltype] = _parse_rpm_capability_list(fields)
+        for line in lzma.open(hdlist, 'rb'):
+            yield handleline(line, add_raw)
 
 if __name__ == '__main__':
     hdlist = sys.argv[1]
