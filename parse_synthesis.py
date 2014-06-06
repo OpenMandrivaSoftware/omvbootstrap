@@ -83,8 +83,7 @@ def _parse_rpm_capability_list(cap_str_list):
 
     return tuple(cap_list)
 
-def handleline(line, add_raw):
-    pkg = {}
+def handleline(pkg, line, add_raw):
     
     if add_raw:
         if 'raw' not in pkg:
@@ -102,8 +101,6 @@ def handleline(line, add_raw):
          pkg['arch']) = _parse_rpm_name(fields.pop(0))
         for field in ('epoch', 'size', 'group'):
             pkg[field] = fields.pop(0)
-        yield pkg
-        pkg = {}
     elif ltype == 'summary':
         pkg['summary'] = fields.pop(0)
     elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
@@ -112,13 +109,21 @@ def handleline(line, add_raw):
 def parse(hdlist, add_raw=False):
     """Create a generator of packages parsed from synthesis hdlist
     file."""
+    
+    pkg = {}
 
     try:
         for line in gzip.open(hdlist, 'rb'):
-            yield handleline(line, add_raw)
+            handleline(pkg, line, add_raw)
+            if 'name' in pkg:
+                yield pkg
+                pkg = {}
     except IOError:
         for line in lzma.open(hdlist, 'rb'):
-            yield handleline(line, add_raw)
+            handleline(pkg, line, add_raw)
+            if 'name' in pkg:
+                yield pkg
+                pkg = {}
 
 if __name__ == '__main__':
     hdlist = sys.argv[1]
