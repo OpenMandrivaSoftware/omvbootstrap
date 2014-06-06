@@ -9,7 +9,9 @@ And now, finals approach. (save me pls)
 
 Requirements:
     python2
+    python backports.lzma
     bash
+    curl
     cpio
     xz/lzma/gzip/bzip2 [depending on the package compression]
         this is usually xz nowadays

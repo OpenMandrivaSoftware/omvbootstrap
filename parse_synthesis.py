@@ -26,6 +26,11 @@ import gzip
 import re
 import sys
 
+try:
+    import lzma
+except ImportError:
+    from backports import lzma
+
 __all__ = ['parse']
 
 def _parse_rpm_name(name):
@@ -84,7 +89,12 @@ def parse(hdlist, add_raw=False):
     file."""
 
     pkg = {}
-    for line in gzip.open(hdlist, 'rb'):
+    try:
+        openList = gzip.open(hdlist, 'rb')
+    except IOError:
+        openList = lzma.open(hdlist, 'rb')
+
+    for line in openList:
 
         if add_raw:
             if 'raw' not in pkg:
@@ -108,24 +118,24 @@ def parse(hdlist, add_raw=False):
             pkg['summary'] = fields.pop(0)
         elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
             pkg[ltype] = _parse_rpm_capability_list(fields)
-    
+
 if __name__ == '__main__':
     hdlist = sys.argv[1]
-    
+
     pkgs = sys.argv[2:]
-    
+
     found = []
-    
+
     metadata = []
-    
+
     for p in parse(hdlist, True):
         metadata.append(p)
-    
+
     # do half-assed backwards search
     for m in metadata:
         if m['name'] in pkgs:
             found.append(m)
-    
+
     # check if we didn't get all the packages
     if len(pkgs) != len(found): # we've missed something
         missing = []
@@ -139,7 +149,7 @@ if __name__ == '__main__':
                 missing.append(i)
         print "could not find some packages in repo: " + ' '.join(missing)
         sys.exit(1)
-    
+
     # we have all packages! now do basic dep resolution
     for pkg in found:
         if 'requires' in pkg:
@@ -164,7 +174,7 @@ if __name__ == '__main__':
                 if satisfied == False:
                     print "package %s requires unsatisfied dep %s" % (pkg['name'], lookingFor)
                     sys.exit(1)
-    
+
     # yay okay let's print package lists and exit
     for pkg in found:
         #if pkg['epoch'] == '0':
