@@ -7,7 +7,7 @@
 # if you have RPM installed
 
 # $1 - RPM package to cpio
-rpm2cpio() {
+ourrpm2cpio() {
 	pkg=$1
 	if [ "$pkg" = "" -o ! -e "$pkg" ]; then
 		echo "no package supplied" 1>&2
@@ -64,7 +64,7 @@ rpm2cpio() {
 # $2 path to chroot
 unpack_rpm() {
 	cd $2
-	rpm2cpio $1 | cpio -idum --quiet
+	ourrpm2cpio $1 | cpio -idum --quiet
 	echo $?
 }
 
