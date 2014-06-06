@@ -26,10 +26,7 @@ import gzip
 import re
 import sys
 
-try:
-    import lzma
-except ImportError:
-    from backports import lzma
+from backports import lzma
 
 __all__ = ['parse']
 
@@ -84,7 +81,7 @@ def _parse_rpm_capability_list(cap_str_list):
     return tuple(cap_list)
 
 def handleline(pkg, line, add_raw):
-    
+
     if add_raw:
         if 'raw' not in pkg:
             pkg['raw'] = ''
@@ -109,7 +106,7 @@ def handleline(pkg, line, add_raw):
 def parse(hdlist, add_raw=False):
     """Create a generator of packages parsed from synthesis hdlist
     file."""
-    
+
     pkg = {}
 
     try:
