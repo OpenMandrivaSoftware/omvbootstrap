@@ -64,7 +64,12 @@ ourrpm2cpio() {
 # $2 path to chroot
 unpack_rpm() {
 	cd $2
-	ourrpm2cpio $1 | cpio -idum --quiet
+    command -v rpm2cpio >/dev/null 2>&1
+    if [ $? = 1 ]; then
+	    ourrpm2cpio $1 | cpio -idum --quiet
+    else
+        rpm2cpio $1 | cpio -idum --quiet
+    fi
 	echo $?
 }
 
