@@ -26,8 +26,6 @@ import gzip
 import re
 import sys
 
-from backports import lzma
-
 __all__ = ['parse']
 
 def _parse_rpm_name(name):
@@ -80,67 +78,59 @@ def _parse_rpm_capability_list(cap_str_list):
 
     return tuple(cap_list)
 
-def handleline(pkg, line, add_raw):
-
-    if add_raw:
-        if 'raw' not in pkg:
-            pkg['raw'] = ''
-        pkg['raw'] += line
-
-    fields = line.rstrip('\n').split('@')[1:]
-    ltype = fields.pop(0)
-
-    if ltype == 'info':
-        (pkg['name'],
-         pkg['version'],
-         pkg['release'],
-         pkg['dist'],
-         pkg['arch']) = _parse_rpm_name(fields.pop(0))
-        for field in ('epoch', 'size', 'group'):
-            pkg[field] = fields.pop(0)
-    elif ltype == 'summary':
-        pkg['summary'] = fields.pop(0)
-    elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
-        pkg[ltype] = _parse_rpm_capability_list(fields)
 
 def parse(hdlist, add_raw=False):
     """Create a generator of packages parsed from synthesis hdlist
     file."""
 
     pkg = {}
+    for line in gzip.open(hdlist, 'rb'):
 
-    try:
-        for line in gzip.open(hdlist, 'rb'):
-            handleline(pkg, line, add_raw)
-            if 'name' in pkg:
-                yield pkg
-                pkg = {}
-    except IOError:
-        for line in lzma.open(hdlist, 'rb'):
-            handleline(pkg, line, add_raw)
-            if 'name' in pkg:
-                yield pkg
-                pkg = {}
+        if add_raw:
+            if 'raw' not in pkg:
+                pkg['raw'] = ''
+            pkg['raw'] += line
 
+        fields = line.rstrip('\n').split('@')[1:]
+        ltype = fields.pop(0)
+
+        if ltype == 'info':
+            (pkg['name'],
+             pkg['version'],
+             pkg['release'],
+             pkg['dist'],
+             pkg['arch']) = _parse_rpm_name(fields.pop(0))
+            for field in ('epoch', 'size', 'group'):
+                pkg[field] = fields.pop(0)
+            yield pkg
+            pkg = {}
+        elif ltype == 'summary':
+            pkg['summary'] = fields.pop(0)
+        elif ltype in ('requires', 'provides', 'conflict', 'obsoletes'):
+            pkg[ltype] = _parse_rpm_capability_list(fields)
+    
 if __name__ == '__main__':
     hdlist = sys.argv[1]
-
+    
     pkgs = sys.argv[2:]
-
+    
     found = []
-
+    
     metadata = []
-
+    
     for p in parse(hdlist, True):
-        metadata.append(p)
-
+        if p['name'] > '':
+            metadata.append(p)
+    
     # do half-assed backwards search
     for m in metadata:
+#        print "Name: " + m['name'] + "\n"
+#        print "Name: " + m['name'] + "\n" + str(m['provides']) + "\n"
         if m['name'] in pkgs:
             found.append(m)
-
+    
     # check if we didn't get all the packages
-    if len(pkgs) != len(found): # we've missed something
+    if len(pkgs) > len(found): # we've missed something
         missing = []
         for i in pkgs:
             ok = False
@@ -152,7 +142,7 @@ if __name__ == '__main__':
                 missing.append(i)
         print "could not find some packages in repo: " + ' '.join(missing)
         sys.exit(1)
-
+    
     # we have all packages! now do basic dep resolution
     for pkg in found:
         if 'requires' in pkg:
@@ -177,7 +167,7 @@ if __name__ == '__main__':
                 if satisfied == False:
                     print "package %s requires unsatisfied dep %s" % (pkg['name'], lookingFor)
                     sys.exit(1)
-
+    
     # yay okay let's print package lists and exit
     for pkg in found:
         #if pkg['epoch'] == '0':
